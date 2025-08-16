@@ -1,0 +1,1855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sleeper Roster & Ownership Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Product+Sans:wght@100;200;300;400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Google+Sans:100,200,300,400,500,600,700" rel="stylesheet">
+    
+    <style>
+        /* --- THEME & FOUNDATION --- */
+        :root {
+            --font-sans: 'Product Sans', 'Google Sans', 'Quicksand', sans-serif;
+
+            /* New Color Palette */
+            --color-bg: #0D0E1B;
+            --color-bg-light: #1E1F30;
+            --color-panel-bg: rgba(22, 24, 43, 0.5); /* Semi-transparent for glass effect */
+            --color-panel-border: rgba(128, 138, 189, 0.2);
+            --color-panel-border-glow: rgba(128, 138, 189, 0.4);
+            
+            --color-text-primary: #EAEBF0;
+            --color-text-secondary: #9096C0;
+            --color-text-tertiary: #5F6795;
+
+            --color-accent-primary: #766DFF;
+            --color-accent-primary-glow: rgba(118, 109, 255, 0.5);
+            --color-accent-secondary: #42C2FF;
+            --color-accent-trade-win: #00F5A0;
+            --color-accent-trade-lose: #FF47A6;
+
+            /* Position Colors (similar hues to original, but more vibrant) */
+            --pos-qb: #FF3A75;
+            --pos-rb: #00EBC7;
+            --pos-wr: #58A7FF;
+            --pos-te: #B469FF;
+            --pos-flx: #A855F7;
+            --pos-sflx: #FF3A75; /* Same as QB for superflex */
+            --pos-bn: #64748b;
+            --pos-tx: #808ea3;
+
+            /* Other vars */
+            --panel-border-radius: 12px;
+            --card-border-radius: 8px;
+            --glow-strength: 8px;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--color-bg);
+            background-image: radial-gradient(circle at 10% 10%, rgba(118, 109, 255, 0.1) 0%, transparent 30%),
+                              radial-gradient(circle at 90% 80%, rgba(66, 194, 255, 0.1) 0%, transparent 30%);
+            color: var(--color-text-primary);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* --- SCROLLBARS --- */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--color-text-tertiary);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--color-text-secondary);
+        }
+
+        /* --- GENERAL UI --- */
+        #loading, #welcome-screen { 
+            text-align: center; 
+            padding: 4rem 2rem; 
+            font-size: 1.2rem; 
+            color: var(--color-text-secondary); 
+            max-width: 600px;
+            margin: 2rem auto;
+        }
+
+        #welcome-screen, #loading {
+            background: var(--color-panel-bg);
+            border: 1px solid var(--color-panel-border);
+            border-radius: var(--panel-border-radius);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+        }
+
+        #welcome-screen h2 { 
+            font-size: 1.5rem; 
+            font-weight: 700; 
+            color: var(--color-text-primary); 
+            margin-bottom: 0.5rem; 
+        }
+
+        #header-container {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            padding: 0.25rem 0;
+            background: linear-gradient(180deg, var(--color-bg) 70%, transparent 100%);
+        }
+
+        /* --- UTILITY CLASSES --- */
+        .glass-panel {
+            background: var(--color-panel-bg);
+            border: 1px solid var(--color-panel-border);
+            border-radius: var(--panel-border-radius);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+        }
+
+        /* --- HEADER & CONTROLS (3-Row Redesign) --- */
+        .app-header {
+            padding: 0.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .header-row {
+            display: flex;
+            flex-wrap: nowrap; /* Prevent wrapping */
+            align-items: center;
+            gap: 0.5rem;
+            width: 100%;
+            overflow-x: auto; /* Allow horizontal scrolling if needed */
+            padding-bottom: 2px; /* space for scrollbar */
+        }
+        .header-row:nth-child(2), .header-row:nth-child(3) {
+            border-top: 1px solid var(--color-panel-border);
+            padding-top: 0.25rem;
+        }
+
+        #contextual-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        #contextual-controls.hidden {
+            display: none;
+        }
+
+        /* Row 1 */
+        .username-area {
+            flex-grow: 1;
+            min-width: 120px; /* prevent it from getting too small */
+            max-width: 150px;
+        }
+        #usernameInput {
+            background: var(--color-bg-light);
+            border: 1px solid var(--color-panel-border);
+            border-radius: 8px;
+            color: var(--color-text-primary);
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+            width: 100%;
+            transition: all 0.2s ease;
+        }
+        #usernameInput:focus {
+            outline: none;
+            border-color: var(--color-accent-primary);
+            box-shadow: 0 0 var(--glow-strength) var(--color-accent-primary-glow);
+        }
+
+        /* Row 2 */
+        .custom-select-wrapper {
+            position: relative;
+            flex-grow: 1;
+            min-width: 120px;
+            max-width: 150px;
+        }
+        #leagueSelect {
+            appearance: none;
+            background-color: var(--color-bg-light);
+            border: 1px solid var(--color-panel-border);
+            border-radius: 8px;
+            padding: 0.25rem 1.5rem 0.25rem 0.5rem;
+            font-size: 0.7rem;
+            color: var(--color-text-primary);
+            width: 100%;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .custom-select-wrapper::after {
+            content: '▼';
+            position: absolute;
+            top: 50%;
+            right: 0.5rem;
+            transform: translateY(-50%) scale(0.6);
+            color: var(--color-text-secondary);
+            pointer-events: none;
+        }
+
+        /* Row 3 */
+        .compare-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        #positional-filters {
+            /* This will no longer grow, allowing the parent to center it */
+            justify-content: center;
+        }
+
+        /* High-End Glass Buttons & Segmented Controls v3 */
+        .primary-switcher, .secondary-switcher, #positional-filters {
+            display: flex;
+            border: 1px solid var(--color-panel-border);
+            border-radius: 8px;
+            padding: 0.15rem;
+            gap: 0.15rem;
+            flex-shrink: 0;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.3));
+            box-shadow: inset 0 1px 1px rgba(255,255,255,0.05);
+        }
+
+        /* --- Base Button Styles --- */
+        .primary-switcher button, .secondary-switcher button, .filter-btn {
+            padding: 0.2rem 0.6rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 1px solid transparent;
+            background: transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            color: var(--color-text-secondary);
+            text-shadow: 0 0 2px rgba(0,0,0,0.2);
+        }
+        /* Primary buttons are bolder */
+        .primary-switcher button {
+            font-weight: 700;
+            font-size: 0.8rem;
+        }
+
+        /* --- Hover States --- */
+        .primary-switcher button:hover, .secondary-switcher button:hover, .filter-btn:hover {
+            color: var(--color-text-primary);
+            background: var(--color-panel-bg);
+        }
+
+        /* --- Active & Counterpart States --- */
+
+        /* Active buttons get a glowing border */
+        .primary-switcher button.active, .secondary-switcher button.active {
+            color: #fff;
+            border-color: var(--color-accent-primary);
+            box-shadow: 0 0 8px var(--color-accent-primary-glow);
+        }
+        /* Secondary active is slightly less prominent */
+        .secondary-switcher button.active {
+            border-color: var(--color-accent-secondary);
+            box-shadow: 0 0 6px var(--color-accent-secondary);
+        }
+
+        /* Counterpart buttons are dimmed */
+        .primary-switcher button.counterpart-active, .secondary-switcher button.counterpart-active {
+            color: var(--color-text-tertiary);
+            background: transparent;
+        }
+        .primary-switcher button.counterpart-active:hover, .secondary-switcher button.counterpart-active:hover {
+            color: var(--color-text-secondary);
+        }
+
+
+        /* Filter Buttons */
+        .filter-btn.active[data-position="QB"] { background-color: var(--pos-qb); color: #fff; }
+        .filter-btn.active[data-position="RB"] { background-color: var(--pos-rb); color: #000; }
+        .filter-btn.active[data-position="WR"] { background-color: var(--pos-wr); color: #fff; }
+        .filter-btn.active[data-position="TE"] { background-color: var(--pos-te); color: #fff; }
+        .filter-btn.active[data-position="FLX"] { background-color: var(--pos-flx); color: #fff; }
+
+        /* Compare Button */
+        .control-button {
+            padding: 0.2rem 0.6rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 1px solid var(--color-panel-border);
+            background: var(--color-bg-light);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            color: var(--color-text-secondary);
+        }
+        .control-button.active {
+            color: #fff;
+            border-color: var(--color-accent-primary);
+            background: var(--color-accent-primary);
+        }
+        .control-button:disabled {
+            background: var(--color-bg-light) !important;
+            color: var(--color-text-tertiary) !important;
+            cursor: not-allowed;
+            border-color: var(--color-panel-border) !important;
+            box-shadow: none !important;
+        }
+        .control-button-subtle {
+            background: none;
+            border: none;
+            color: var(--color-text-secondary);
+            text-decoration: underline;
+            font-size: 0.75rem;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        /* --- ROSTER VIEW --- */
+        #rosterContainer { 
+            width: 100%; 
+            overflow-x: auto; 
+            padding: 0.25rem;
+        }
+        #rosterGrid { 
+            display: flex; 
+            flex-direction: row; 
+            flex-wrap: nowrap; 
+            gap: 0.5rem; 
+            min-width: min-content; 
+            padding-bottom: 1rem; /* For scrollbar clearance */
+        }
+        .roster-column { 
+            width: 135px; 
+            flex-shrink: 0; 
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .team-header-item { 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-size: 0.9rem; 
+            font-weight: 600; 
+            color: var(--color-text-primary); 
+            text-align: center; 
+            padding: 0.5rem; 
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .team-header-item:hover {
+            background-color: var(--color-bg-light);
+        }
+
+        .team-card { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 0.25rem;
+        }
+
+        .roster-section h3 {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .8px;
+            margin-bottom: 0.2rem;
+            color: var(--color-text-primary);
+            text-align: center;
+            padding: 0.0rem 0;
+            background: #7f91bd10a;
+            backdrop-filter: blur(54px);
+            -webkit-backdrop-filter: blur(54px);
+            border-radius: 6px;
+            border: 0.5px dotted rgba(128, 138, 189, 0.1);
+            box-shadow: 0 0 7px var(--color-text-primary);
+        }
+         .qb-section h3 { 
+            color: var(--pos-qb);
+            box-shadow: 0 0 7px var(--pos-qb); }
+         .rb-section h3 { 
+            color: var(--pos-rb); 
+            box-shadow: 0 0 7px var(--pos-rb); }
+          .wr-section h3 { 
+            color: var(--pos-wr);
+            box-shadow: 0 0 7px var(--pos-wr); }
+         .te-section h3 { 
+            color: var(--pos-te); 
+            box-shadow: 0 0 7px var(--pos-te); }
+
+    /* --- Player & Pick Card Styles --- */
+        .player-row, .pick-row {
+            background: var(--color-panel-bg);
+            border: 1px solid var(--color-panel-border);
+            border-radius: var(--card-border-radius);
+            padding: 0.2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+            transition: all 0.2s ease;
+        }
+        .is-trade-mode .player-row, .is-trade-mode .pick-row { 
+            cursor: pointer; 
+        }
+        .is-trade-mode .player-row:hover, .is-trade-mode .pick-row:hover {
+            border-color: var(--color-panel-border-glow);
+            transform: translateY(-2px);
+        }
+
+        .player-selected {
+            border-color: var(--color-accent-primary) !important;
+            box-shadow: 0 0 var(--glow-strength) var(--color-accent-primary-glow);
+        }
+
+        .player-main-line {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            gap: 0.7rem;
+        }
+        .player-name { 
+            font-weight: 400; 
+            font-size: 0.8rem; 
+            color: var(--color-text-primary);
+            line-height: 1.2;
+        }
+        .player-tag {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            font-weight: 700;
+            padding: 1px 4px;
+            border-radius: 5px;
+            color: var(--color-bg);
+            line-height: 1;
+        }
+
+        .player-meta-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.1rem 0.1rem;
+            gap: 0.0rem;
+            font-size: 0.65rem;
+            color: var(--color-text-secondary);
+        }
+        .team-tag {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            font-weight: 700;
+            padding: 1px 4px;
+            border-radius: 4px;
+            line-height: 1;
+        }
+
+        .player-value-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.65rem;
+            color: var(--color-text-secondary);
+            background: #1d223faa;
+            border-radius: 6px;
+            padding: 0.0rem 0.1rem;
+        }
+        .player-value-line .value {
+            font-weight: 700;
+            font-size: 0.7rem;
+            color: var(--color-text-primary);
+        }
+
+        .pick-row {
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .pick-label {
+            font-weight: 700;
+            font-size: 0.75rem;
+        }
+        .pick-ktc {
+            font-size: 0.7rem;
+            color: var(--color-text-secondary);
+        }
+        .pick-ktc .value {
+            font-weight: 700;
+            color: var(--color-text-primary);
+        }
+
+        .team-compare-checkbox {
+            appearance: none;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid var(--color-text-tertiary);
+            border-radius: 50%;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease-in-out;
+            flex-shrink: 0;
+        }
+        .team-compare-checkbox.selected {
+            border-color: var(--color-accent-primary);
+            background-color: var(--color-accent-primary);
+            box-shadow: 0 0 var(--glow-strength) var(--color-accent-primary-glow);
+        }
+        .team-compare-checkbox.selected::after {
+            content: '✓';
+            position: absolute;
+            color: var(--color-bg);
+            font-size: 0.7rem;
+            font-weight: 900;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* --- TRADE SIMULATOR --- */
+        #tradeSimulator {
+            position: fixed;
+            bottom: 1rem;
+            left: 1rem;
+            right: 1rem;
+            z-index: 20;
+            display: none;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .trade-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .trade-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 0 0.5rem; 
+        }
+        .trade-header h3 { 
+            font-size: 1rem; 
+            font-weight: 700; 
+            color: var(--color-text-primary); 
+            text-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+        #clearTradeButton { 
+            background: var(--color-bg-light); 
+            color: var(--color-text-secondary); 
+            font-size: 0.8rem; 
+            padding: 4px 10px; 
+            border-radius: 6px;
+            border: 1px solid var(--color-panel-border);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        #clearTradeButton:hover {
+            color: var(--color-text-primary);
+            border-color: var(--color-panel-border-glow);
+        }
+
+        .trade-body { 
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .trade-divider {
+            width: 2px;
+            height: 80%;
+            background-image: linear-gradient(to bottom, transparent, var(--color-accent-secondary), transparent);
+            opacity: 0.7;
+        }
+
+        .trade-team-column { 
+            display: flex; 
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .trade-team-column h4 { 
+            font-size: 0.9rem; 
+            font-weight: 600; 
+            margin-bottom: 0.25rem; 
+            text-align: center;
+            color: var(--color-text-secondary);
+        }
+
+        .trade-assets { 
+            min-height: 50px; 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 5px; 
+            align-content: flex-start; 
+            flex-grow: 1; 
+            background: var(--color-bg-light);
+            border-radius: var(--panel-border-radius);
+            padding: 0.5rem;
+        }
+        .trade-asset-chip { 
+            background: var(--color-panel-bg); 
+            border: 1px solid var(--color-panel-border);
+            font-size: 0.75rem; 
+            padding: 3px 7px; 
+            border-radius: 6px; 
+            display: flex; 
+            gap: 5px; 
+            align-items: center;
+            color: var(--color-text-secondary);
+        }
+        .trade-asset-chip .ktc { 
+            font-weight: 700;
+            color: var(--color-text-primary);
+        }
+
+        .trade-total { 
+            margin-top: 0.25rem; 
+            text-align: center; 
+            font-size: 1rem; 
+            font-weight: 700; 
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .trade-total.winning {
+            box-shadow: 0 0 12px var(--color-accent-trade-win);
+            color: var(--color-accent-trade-win);
+        }
+        .trade-total.losing {
+            box-shadow: 0 0 12px var(--color-accent-trade-lose);
+            color: var(--color-accent-trade-lose);
+        }
+        .trade-total.even {
+            color: var(--color-accent-secondary);
+        }
+
+        /* --- OWNERSHIP (PLAYER LIST) VIEW --- */
+        #playerListView { 
+            max-width: 700px; 
+            margin: 0 auto; 
+        }
+        #playerSearch { 
+            background: var(--color-panel-bg);
+            border: 1px solid var(--color-panel-border);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: var(--color-text-primary); 
+            padding: 0.75rem 1rem; 
+            border-radius: var(--panel-border-radius); 
+            font-size: 1rem; 
+            width: 100%; 
+            margin: 1rem auto; 
+            display: block;
+            transition: all 0.2s ease;
+        }
+        #playerSearch:focus {
+            outline: none;
+            border-color: var(--color-accent-primary);
+            box-shadow: 0 0 var(--glow-strength) var(--color-accent-primary-glow);
+        }
+        #playerSearch::placeholder { 
+            color: var(--color-text-secondary); 
+        }
+
+        .player-list-section { 
+            border-radius: 6px; 
+            overflow: hidden; 
+        }
+
+        .pl-player-row { 
+            display: flex; 
+            align-items: center; 
+            padding: 0.5rem 0.75rem; 
+            font-size: 0.9rem;
+        }
+        .player-list-section .pl-player-row:nth-child(odd) { 
+            background-color: var(--color-bg-light); 
+        }
+        .player-list-section .pl-player-row:nth-child(even) { 
+            background-color: transparent;
+        }
+
+        .pl-player-info { 
+            display: flex; 
+            flex-direction: column; 
+            flex: 1; 
+            min-width: 0;
+        }
+        .pl-player-name { 
+            font-size: 0.9rem; 
+            font-weight: 600; 
+            color: var(--color-text-primary); 
+            display: flex; 
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .pl-player-details { 
+            font-size: 0.8rem; 
+            color: var(--color-text-secondary); 
+            font-weight: 500; 
+            margin-top: 2px; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+        }
+        .pl-list-tag { 
+            min-width: 32px; 
+            height: 22px; 
+            line-height: 22px; 
+            font-size: 0.8rem; 
+            font-weight: 700; 
+            text-align: center; 
+            border-radius: 5px; 
+            color: var(--color-bg); 
+            flex-shrink: 0;
+            margin-right: 0.5rem;
+        }
+
+        .pl-list-tag-spacer {
+            width: 32px;
+            height: 1px;
+            flex-shrink: 0;
+            margin-right: 0.5rem;
+        }
+
+        .pl-right-meta {
+            display: grid;
+            grid-template-columns: 35px 45px 1fr;
+            column-gap: 1rem;
+            align-items: center;
+            font-size: 0.85rem;
+            color: var(--color-text-secondary);
+            font-weight: 600;
+            flex-shrink: 0;
+            width: 220px;
+            text-align: right;
+        }
+        .pl-col-count, .pl-col-pct { 
+            text-align: center; 
+            font-variant-numeric: tabular-nums;
+        }
+        .pl-col-lgs { 
+            text-align: left; 
+            white-space: normal; 
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--color-text-tertiary);
+        }
+
+        .pl-list-header { 
+            background: rgba(0,0,0,0.2) !important; 
+            color: var(--color-text-secondary); 
+            text-transform: uppercase; 
+            letter-spacing: .8px; 
+            font-weight: 700; 
+            font-size: 0.7rem;
+        }
+        .pl-list-header .pl-player-name {
+            font-size: 0.7rem;
+            color: var(--color-text-secondary);
+        }
+        .pl-list-header .pl-right-meta {
+            font-size: 0.7rem;
+        }
+        .pl-list-header .pl-player-details { display: none; }
+
+        .pl-count-high, .pl-pct-high { color: var(--color-accent-trade-win); }
+        .pl-count-mid, .pl-pct-mid { color: var(--color-accent-secondary); }
+        .pl-count-low, .pl-pct-low { color: var(--color-text-secondary); }
+
+        /* --- Responsive Header Layout --- */
+        @media (min-width: 820px) {
+            .app-header {
+                flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: center;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.25rem 0.5rem;
+            }
+
+            #contextual-controls {
+                display: contents;
+            }
+
+            .header-row {
+                width: auto;
+                border-top: none !important;
+                padding-top: 0 !important;
+                padding-bottom: 0 !important;
+            }
+            
+            .header-row:has(#positional-filters) {
+                flex-basis: 100%;
+                justify-content: center;
+                margin-top: 0.25rem;
+            }
+
+            .header-row:has(.compare-controls) {
+                /* This will make the row containing filters and compare buttons take only the space it needs */
+                width: auto;
+                flex-grow: 0;
+            }
+
+            #positional-filters {
+                flex-grow: 0; /* Prevents the filter group from expanding */
+            }
+
+            .username-area, .custom-select-wrapper {
+                flex-grow: 0;
+                max-width: 220px;
+            }
+        }
+
+    </style>
+</head>
+<body class="p-2 sm:p-4">
+    <div id="header-container">
+        <header class="app-header glass-panel">
+            <!-- Row 1: Username and Main View Switcher -->
+            <div class="header-row">
+                <div class="username-area">
+                    <input type="text" id="usernameInput" placeholder="Sleeper Username..." value="The_Oracle">
+                </div>
+                <div class="app-view-switcher primary-switcher">
+                    <button id="fetchRostersButton">Rosters</button>
+                    <button id="fetchOwnershipButton">Ownership %</button>
+                </div>
+            </div>
+            
+            <!-- This container will be shown/hidden based on context -->
+            <div id="contextual-controls" class="hidden">
+                <!-- Row 2: League Select and Roster View Switcher -->
+                <div class="header-row">
+                    <div class="custom-select-wrapper">
+                        <select id="leagueSelect" disabled>
+                            <option>Select a league...</option>
+                        </select>
+                    </div>
+                    <div class="view-switcher secondary-switcher">
+                        <button id="positionalViewBtn">Positional</button>
+                        <button id="depthChartViewBtn">Depth Chart</button>
+                    </div>
+                </div>
+                <!-- Row 3: Compare and Filters -->
+                <div class="header-row">
+                     <div id="positional-filters">
+                        <button data-position="QB" class="filter-btn">QB</button>
+                        <button data-position="RB" class="filter-btn">RB</button>
+                        <button data-position="WR" class="filter-btn">WR</button>
+                        <button data-position="TE" class="filter-btn">TE</button>
+                        <button data-position="FLX" class="filter-btn">FLX</button>
+                    </div>
+                    <div class="compare-controls">
+                         <button id="compareButton" class="control-button" disabled>Compare</button>
+                         <button id="clearCompareButton" class="control-button-subtle hidden">Clear</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+    </div>
+    <main id="content" class="container mx-auto">
+        <div id="welcome-screen">
+            <h2>Welcome to the Sleeper Tool</h2>
+            <p>Enter a Sleeper username and click 'Rosters' or 'Ownership %' to get started.</p>
+        </div>
+        <div id="loading" class="hidden">Loading...</div>
+        
+        <!-- View for Roster Grid -->
+        <div id="rosterView" class="hidden">
+            <div id="rosterContainer">
+                 <div id="rosterGrid"></div>
+            </div>
+        </div>
+
+        <!-- View for Player List -->
+        <div id="playerListView" class="hidden">
+            <!-- Content will be generated by JS -->
+        </div>
+    </main>
+
+    <div id="tradeSimulator">
+        <!-- Content generated by JS -->
+    </div>
+
+    
+    <script>
+        // --- DOM Elements ---
+        const usernameInput = document.getElementById('usernameInput');
+        const fetchRostersButton = document.getElementById('fetchRostersButton');
+        const fetchOwnershipButton = document.getElementById('fetchOwnershipButton');
+        const leagueSelect = document.getElementById('leagueSelect');
+        const contextualControls = document.getElementById('contextual-controls');
+        const rosterControls = document.getElementById('rosterControls');
+        const loadingIndicator = document.getElementById('loading');
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const rosterView = document.getElementById('rosterView');
+        const playerListView = document.getElementById('playerListView');
+        const rosterContainer = document.getElementById('rosterContainer');
+        const rosterGrid = document.getElementById('rosterGrid');
+        const compareButton = document.getElementById('compareButton');
+        const clearCompareButton = document.getElementById('clearCompareButton');
+        const positionalViewBtn = document.getElementById('positionalViewBtn');
+        const depthChartViewBtn = document.getElementById('depthChartViewBtn');
+        const viewControls = document.getElementById('view-controls');
+        const positionalFiltersContainer = document.getElementById('positional-filters');
+        const tradeSimulator = document.getElementById('tradeSimulator');
+        const mainContent = document.getElementById('content');
+
+        // --- State ---
+        let state = { userId: null, leagues: [], players: {}, oneQbData: {}, sflxData: {}, currentLeagueId: null, isSuperflex: false, cache: {}, teamsToCompare: new Set(), isCompareMode: false, currentRosterView: 'positional', activePositions: new Set(), tradeBlock: {} };
+        const assignedLeagueColors = new Map();
+        let nextColorIndex = 0;
+        const assignedRyColors = new Map();
+        let nextRyColorIndex = 0;
+
+        // --- Constants ---
+        const API_BASE = 'https://api.sleeper.app/v1';
+        const GOOGLE_SHEET_ID = '1MDTf1IouUIrm4qabQT9E5T0FsJhQtmaX55P32XK5c_0';
+        const TAG_COLORS = { QB:"var(--pos-qb)", RB:"var(--pos-rb)", WR:"var(--pos-wr)", TE:"var(--pos-te)", BN:"var(--pos-bn)", TX:"var(--pos-tx)", FLX: "var(--pos-flx)", SFLX: "var(--pos-sflx)" };
+        const STARTER_ORDER = ['QB', 'RB', 'WR', 'TE', 'FLEX', 'SUPER_FLEX'];
+        const TEAM_COLORS = { ARI:"#97233F", ATL:"#A71930", BAL:"#241773", BUF:"#00338D", CAR:"#0085CA", CHI:"#1a2d4e", CIN:"#FB4F14", CLE:"#311D00", DAL:"#003594", DEN:"#FB4F14", DET:"#0076B6", GB:"#203731", HOU:"#03202F", IND:"#002C5F", JAX:"#006778", KC:"#E31837", LAC:"#0080C6", LAR:"#003594", LV:"#A5ACAF", MIA:"#008E97", MIN:"#4F2683", NE:"#002244", NO:"#D3BC8D", NYG:"#0B2265", NYJ:"#125740", PHI:"#004C54", PIT:"#FFB612", SEA:"#69BE28", SF:"#B3995D", TB:"#D50A0A", TEN:"#4B92DB", WAS:"#5A1414", FA: "#64748b" };
+        const LEAGUE_COLOR_PALETTE = ['#e8d28a', '#bfeee5', '#d9d0ff', '#cfe9ff', '#ffd6e7', '#d9ffcf', '#ffc7a8', '#a8d8ff', '#f2c8ff', '#c8ffde'];
+        const RY_COLOR_PALETTE = ['#d7f2ff', '#cfe9ff', '#e0f6ea', '#fff1d6', '#efe2ff', '#ffe0ea', '#e4f0ff'];
+        const LEAGUE_ABBR_OVERRIDES = { "Big Boofers Club(BBC)": "BBC", "Dynasty footballers": "DFBS", "FF D-League": "DL", "La Leaguaaa dynasty est2024": "LLGA", "The Most Important League": "TMIL", "Trade, Hoard, Eat. League": "THE" };
+
+        // --- Event Listeners ---
+        fetchRostersButton.addEventListener('click', handleFetchRosters);
+        fetchOwnershipButton.addEventListener('click', handleFetchOwnership);
+        leagueSelect.addEventListener('change', handleLeagueSelect);
+        rosterGrid.addEventListener('click', handleTeamSelect);
+        mainContent.addEventListener('click', handleAssetClickForTrade);
+        compareButton.addEventListener('click', handleCompareClick);
+        clearCompareButton.addEventListener('click', handleClearCompare);
+        positionalViewBtn.addEventListener('click', () => setRosterView('positional'));
+        depthChartViewBtn.addEventListener('click', () => setRosterView('depth'));
+        positionalFiltersContainer.addEventListener('click', handlePositionFilter);
+        
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            setLoading(true, 'Loading initial data...');
+            await Promise.all([ fetchSleeperPlayers(), fetchDataFromGoogleSheet() ]);
+            setLoading(false);
+            welcomeScreen.classList.remove('hidden');
+        });
+
+        // --- View Toggling and Main Handlers ---
+        function setRosterView(view) {
+            state.currentRosterView = view;
+            const isPositional = view === 'positional';
+            positionalViewBtn.classList.toggle('active', isPositional);
+            depthChartViewBtn.classList.toggle('active', !isPositional);
+
+            positionalViewBtn.classList.toggle('counterpart-active', !isPositional);
+            depthChartViewBtn.classList.toggle('counterpart-active', isPositional);
+
+            if (state.currentTeams) {
+                renderAllTeamData(state.currentTeams);
+            }
+        }
+
+        function updateButtonStates(activeButton) {
+            const isRosters = activeButton === 'rosters';
+            fetchRostersButton.classList.toggle('active', isRosters);
+            fetchOwnershipButton.classList.toggle('active', !isRosters);
+
+            fetchRostersButton.classList.toggle('counterpart-active', !isRosters);
+            fetchOwnershipButton.classList.toggle('counterpart-active', isRosters);
+        }
+
+        async function handleFetchRosters() {
+            const username = usernameInput.value.trim();
+            if (!username) return;
+            
+            setLoading(true, 'Fetching user leagues...');
+            
+            try {
+                await fetchAndSetUser(username);
+                const leagues = await fetchUserLeagues(state.userId);
+                state.leagues = leagues.sort((a, b) => a.name.localeCompare(b.name));
+                
+                updateButtonStates('rosters');
+                contextualControls.classList.remove('hidden');
+                playerListView.classList.add('hidden');
+                rosterView.classList.remove('hidden');
+                setRosterView('positional'); // Set default view
+                
+                populateLeagueSelect(state.leagues);
+
+                if (state.leagues.length > 0) {
+                    leagueSelect.selectedIndex = 1;
+                    await handleLeagueSelect();
+                } else {
+                    contextualControls.classList.add('hidden');
+                }
+            } catch (error) {
+                handleError(error, username);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function handleFetchOwnership() {
+            const username = usernameInput.value.trim();
+            if (!username) return;
+            
+            setLoading(true, 'Fetching ownership data...');
+
+            try {
+                await fetchAndSetUser(username);
+                
+                updateButtonStates('ownership');
+                contextualControls.classList.add('hidden');
+                rosterView.classList.add('hidden');
+                playerListView.classList.remove('hidden');
+
+                await renderPlayerList();
+            } catch (error) {
+                handleError(error, username);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function handleLeagueSelect() {
+            const leagueId = leagueSelect.value;
+            if (!leagueId || leagueId === 'Select a league...') {
+                rosterView.classList.add('hidden');
+                return;
+            };
+            
+            state.currentLeagueId = leagueId;
+            handleClearCompare(); 
+            const leagueInfo = state.leagues.find(l => l.league_id === leagueId);
+            const leagueName = leagueInfo?.name || 'league';
+            setLoading(true, `Loading ${leagueName}...`);
+            rosterGrid.innerHTML = '';
+
+            try {
+                const rosterPositions = leagueInfo.roster_positions;
+                const superflexSlots = rosterPositions.filter(p => p === 'SUPER_FLEX').length;
+                const qbSlots = rosterPositions.filter(p => p === 'QB').length;
+                state.isSuperflex = (superflexSlots > 0) || (qbSlots > 1);
+                
+                const [rosters, users, tradedPicks] = await Promise.all([
+                    fetchWithCache(`${API_BASE}/league/${leagueId}/rosters`),
+                    fetchWithCache(`${API_BASE}/league/${leagueId}/users`),
+                    fetchWithCache(`${API_BASE}/league/${leagueId}/traded_picks`),
+                ]);
+                
+                const teams = processRosterData(rosters, users, tradedPicks, leagueInfo);
+                
+                const userTeam = teams.find(team => team.isUserTeam);
+                if (userTeam) {
+                    state.teamsToCompare.add(userTeam.teamName);
+                }
+                updateCompareButtonState();
+
+                renderAllTeamData(teams);
+                
+                rosterView.classList.remove('hidden');
+
+            } catch (error) {
+                console.error(`Error loading league ${leagueId}:`, error);
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        // --- Compare & Trade Logic ---
+        function handleTeamSelect(e) {
+            const header = e.target.closest('.team-header-item');
+            if (header) {
+                const checkbox = header.querySelector('.team-compare-checkbox');
+                const teamName = checkbox.dataset.teamName;
+                checkbox.classList.toggle('selected');
+                if (state.teamsToCompare.has(teamName)) {
+                    state.teamsToCompare.delete(teamName);
+                } else {
+                    state.teamsToCompare.add(teamName);
+                }
+                updateCompareButtonState();
+            }
+        }
+
+        function handleCompareClick() {
+            state.isCompareMode = !state.isCompareMode;
+            rosterView.classList.toggle('is-trade-mode', state.isCompareMode);
+            updateCompareButtonState();
+            renderAllTeamData(state.currentTeams); 
+            renderTradeBlock();
+        }
+
+        function handleClearCompare() {
+            state.teamsToCompare.clear();
+            state.isCompareMode = false;
+            rosterView.classList.remove('is-trade-mode');
+            document.querySelectorAll('.team-compare-checkbox.selected').forEach(el => el.classList.remove('selected'));
+            updateCompareButtonState();
+            clearTrade();
+            if (state.currentTeams) {
+                renderAllTeamData(state.currentTeams);
+            }
+        }
+
+        function updateCompareButtonState() {
+            const count = state.teamsToCompare.size;
+            compareButton.disabled = count < 2;
+            clearCompareButton.classList.toggle('hidden', count === 0);
+
+            if (state.isCompareMode) {
+                compareButton.textContent = 'Show All';
+                compareButton.classList.add('active');
+            } else {
+                compareButton.textContent = 'Compare';
+                compareButton.classList.remove('active');
+            }
+            
+            if (count < 2 && state.isCompareMode) {
+                handleCompareClick(); // Automatically exit compare mode
+            }
+        }
+
+        function handleAssetClickForTrade(e) {
+            if (!state.isCompareMode) return;
+
+            const assetRow = e.target.closest('.player-row, .pick-row');
+            if (!assetRow) return;
+
+            const teamName = assetRow.closest('.roster-column')?.dataset.teamName;
+            if (!teamName || !state.teamsToCompare.has(teamName)) return;
+
+            const { assetId, assetLabel, assetKtc } = assetRow.dataset;
+            if (!assetId) return;
+
+            if (!state.tradeBlock[teamName]) {
+                state.tradeBlock[teamName] = [];
+            }
+
+            const assetIndex = state.tradeBlock[teamName].findIndex(a => a.id === assetId);
+
+            if (assetIndex > -1) {
+                state.tradeBlock[teamName].splice(assetIndex, 1);
+                assetRow.classList.remove('player-selected');
+            } else {
+                state.tradeBlock[teamName].push({
+                    id: assetId,
+                    label: assetLabel,
+                    ktc: parseInt(assetKtc, 10) || 0
+                });
+                assetRow.classList.add('player-selected');
+            }
+            
+            renderTradeBlock();
+        }
+
+        function clearTrade() {
+            state.tradeBlock = {};
+            document.querySelectorAll('.player-selected').forEach(el => el.classList.remove('player-selected'));
+            renderTradeBlock();
+        }
+
+
+        // --- Position Filter Logic ---
+        function handlePositionFilter(e) {
+            if (e.target.tagName !== 'BUTTON') return;
+            const btn = e.target;
+            const position = btn.dataset.position;
+            const flexPositions = ['RB', 'WR', 'TE'];
+
+            if (position === 'FLX') {
+                const isActivating = !state.activePositions.has('FLX');
+                state.activePositions.clear();
+                if (isActivating) {
+                    flexPositions.forEach(p => state.activePositions.add(p));
+                    state.activePositions.add('FLX');
+                }
+            } else {
+                state.activePositions.delete('FLX');
+                if (state.activePositions.has(position)) {
+                    state.activePositions.delete(position);
+                } else {
+                    state.activePositions.add(position);
+                }
+            }
+            
+            updatePositionFilterButtons();
+            renderAllTeamData(state.currentTeams);
+        }
+        
+        function updatePositionFilterButtons() {
+            const buttons = positionalFiltersContainer.querySelectorAll('.filter-btn');
+            buttons.forEach(btn => {
+                const pos = btn.dataset.position;
+                btn.classList.toggle('active', state.activePositions.has(pos));
+            });
+        }
+
+
+        // --- Data Fetching & Processing ---
+        async function fetchAndSetUser(username) {
+            const userRes = await fetchWithCache(`${API_BASE}/user/${username}`);
+            if (!userRes || !userRes.user_id) throw new Error('User not found.');
+            state.userId = userRes.user_id;
+        }
+
+        async function fetchUserLeagues(userId) {
+            const currentYear = new Date().getFullYear();
+            const leaguesRes = await fetchWithCache(`${API_BASE}/user/${userId}/leagues/nfl/${currentYear}`);
+            if (!leaguesRes || leaguesRes.length === 0) throw new Error(`No leagues found for this user for ${currentYear}.`);
+            return leaguesRes;
+        }
+
+        async function fetchSleeperPlayers() {
+            try { state.players = await fetchWithCache(`${API_BASE}/players/nfl`); } catch (e) { console.error("Failed to fetch Sleeper players:", e); }
+        }
+        
+        async function fetchDataFromGoogleSheet() {
+            const sheetNames = { oneQb: 'KTC_1QB', sflx: 'KTC_SFLX' };
+            try {
+                const [oneQbCsv, sflxCsv] = await Promise.all([
+                    fetch(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${sheetNames.oneQb}`).then(res => res.text()),
+                    fetch(`https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${sheetNames.sflx}`).then(res => res.text())
+                ]);
+                state.oneQbData = parseSheetData(oneQbCsv);
+                state.sflxData = parseSheetData(sflxCsv);
+            } catch (e) { console.error("Fatal Error: Could not fetch data from Google Sheet.", e); }
+        }
+
+        function parseSheetData(csvText) {
+            const dataMap = {};
+            const lines = csvText.split(/\r?\n/).slice(1);
+            lines.forEach(line => {
+                const columns = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+                if (columns.length < 13) return;
+                const clean = (str) => str ? str.replace(/"/g, '').trim() : '';
+                const pos = clean(columns[2]);
+                const sleeperId = clean(columns[12]);
+                const adp = parseFloat(clean(columns[11]));
+                const ktcValue = parseInt(clean(columns[6]), 10);
+                const posRank = clean(columns[7]);
+                if (pos === 'RDP') {
+                    const pickName = clean(columns[1]);
+                    if (pickName) dataMap[pickName] = { adp: null, ktc: ktcValue, posRank: null };
+                } else if (sleeperId && sleeperId !== 'NA') {
+                    dataMap[sleeperId] = { adp: isNaN(adp) ? null : adp, ktc: isNaN(ktcValue) ? null : ktcValue, posRank: posRank };
+                }
+            });
+            return dataMap;
+        }
+
+        function processRosterData(rosters, users, tradedPicks, leagueInfo) {
+            const userMap = users.reduce((acc, user) => ({ ...acc, [user.user_id]: user }), {});
+            const rosterPositions = leagueInfo.roster_positions;
+            const taxiSlots = leagueInfo.settings.taxi_slots || 0;
+
+            const teams = rosters.map(roster => {
+                const owner = userMap[roster.owner_id];
+                const allPlayers = roster.players || [];
+                
+                const starterIds = roster.starters || [];
+                const starters = starterIds.map((playerId, index) => {
+                    const slot = rosterPositions[index] || 'FLEX';
+                    return getPlayerData(playerId, slot);
+                }).sort((a, b) => STARTER_ORDER.indexOf(a.slot) - STARTER_ORDER.indexOf(b.slot));
+
+                const currentTaxiPlayers = (roster.taxi || []).map(p => getPlayerData(p, 'TX')).sort((a, b) => (b.ktc || 0) - (a.ktc || 0));
+                const emptyTaxiSlots = Array(Math.max(0, taxiSlots - currentTaxiPlayers.length)).fill({ isPlaceholder: true });
+                const taxi = [...currentTaxiPlayers, ...emptyTaxiSlots];
+
+                const bench = allPlayers.filter(pId => pId && !starterIds.includes(pId) && !(roster.taxi || []).includes(pId));
+                const draftPicks = getOwnedPicks(roster.roster_id, tradedPicks, leagueInfo);
+                
+                return {
+                    isUserTeam: roster.owner_id === state.userId,
+                    teamName: owner?.display_name || `Team ${roster.roster_id}`,
+                    starters,
+                    bench: bench.map(p => getPlayerData(p, 'BN')).sort((a, b) => (b.ktc || 0) - (a.ktc || 0)),
+                    taxi,
+                    draftPicks: draftPicks.map(p => getPickData(p, leagueInfo)),
+                    allPlayers: allPlayers.map(pId => getPlayerData(pId, ''))
+                };
+            });
+            
+            state.currentTeams = teams;
+
+            return teams.sort((a, b) => {
+                if (a.isUserTeam) return -1;
+                if (b.isUserTeam) return 1;
+                return a.teamName.localeCompare(b.teamName);
+            });
+        }
+        
+        function getOwnedPicks(rosterId, tradedPicks, leagueInfo) {
+            const defaultRounds = leagueInfo.settings.draft_rounds || 5;
+            const leagueSeason = parseInt(leagueInfo.season);
+            const firstPickSeason = leagueSeason + 1;
+            let ownedPicks = [];
+
+            for (let i = 0; i < 4; i++) {
+                const season = firstPickSeason + i;
+                for (let round = 1; round <= defaultRounds; round++) {
+                    ownedPicks.push({ season: String(season), round, original_owner_id: rosterId });
+                }
+            }
+
+            tradedPicks.forEach(pick => {
+                if (pick.roster_id === rosterId && pick.owner_id !== rosterId) {
+                    const i = ownedPicks.findIndex(p => p.season === pick.season && p.round === pick.round && p.original_owner_id === rosterId);
+                    if (i > -1) ownedPicks.splice(i, 1);
+                }
+                if (pick.owner_id === rosterId && pick.roster_id !== rosterId) {
+                    if (parseInt(pick.season) >= firstPickSeason) {
+                        ownedPicks.push({ season: pick.season, round: pick.round, original_owner_id: pick.roster_id });
+                    }
+                }
+            });
+            ownedPicks = ownedPicks.filter(p => parseInt(p.season) < 2029);
+            return ownedPicks.sort((a, b) => a.season.localeCompare(b.season) || a.round - b.round);
+        }
+
+        function getPlayerData(playerId, slot) {
+            const player = state.players[playerId];
+            if (!player) return { id: playerId, name: 'Unknown Player', pos: '?', age: '?', team: '?', adp: null, ktc: null, slot, posRank: null };
+            const valueData = state.isSuperflex ? state.sflxData[playerId] : state.oneQbData[playerId];
+            let lastName = player.last_name || '';
+            if (lastName.includes('-')) lastName = lastName.split('-')[0];
+            let displayName = `${player.first_name.charAt(0)}. ${lastName}`;
+            if (displayName.length > 15) displayName = displayName.substring(0, 14) + '…';
+
+            return { id: playerId, name: displayName, pos: player.position || '?', age: player.age || '?', team: player.team || 'FA', adp: valueData?.adp || null, ktc: valueData?.ktc || null, slot, posRank: valueData?.posRank || null };
+        }
+
+        function getPickData(pick) {
+            const { season, round } = pick;
+            const label = `${season} ${ordinalSuffix(round)}`;
+            const staticVals = { oneqb: { 1: 5200, 2: 3200, 3: 2000, 4: 1200, 5: 400 }, sflx: { 1: 4300, 2: 2600, 3: 1700, 4: 1000, 5: 400 } };
+            let ktc = null;
+            if (parseInt(season) >= 2028 || round >= 5) {
+                ktc = (state.isSuperflex ? staticVals.sflx : staticVals.oneqb)[round] || null;
+            } else {
+                const sfx = round === 1 ? 'st' : round === 2 ? 'nd' : round === 3 ? 'rd' : 'th';
+                const ktcKey = `${season} Mid ${round}${sfx}`;
+                const dataSet = state.isSuperflex ? state.sflxData : state.oneQbData;
+                ktc = dataSet[ktcKey]?.ktc || null;
+            }
+            return { label, ktc, id: `${season}-${round}-${pick.original_owner_id}` };
+        }
+
+        // --- UI Rendering ---
+        function populateLeagueSelect(leagues) {
+            leagueSelect.innerHTML = '<option>Select a league...</option>';
+            leagues.forEach(l => {
+                const opt = document.createElement('option');
+                opt.value = l.league_id;
+                opt.textContent = l.name;
+                leagueSelect.appendChild(opt);
+            });
+            leagueSelect.disabled = false;
+        }
+
+        function renderAllTeamData(teams) {
+            rosterGrid.innerHTML = '';
+            let teamsToRender = teams;
+            if (state.isCompareMode) {
+                teamsToRender = teams.filter(team => state.teamsToCompare.has(team.teamName));
+            }
+
+            teamsToRender.forEach(team => {
+                const columnWrapper = document.createElement('div');
+                columnWrapper.className = 'roster-column';
+                columnWrapper.dataset.teamName = team.teamName;
+                
+                const header = document.createElement('div');
+                header.className = 'team-header-item';
+                
+                const checkbox = document.createElement('div');
+                checkbox.className = 'team-compare-checkbox';
+                if (state.teamsToCompare.has(team.teamName)) {
+                    checkbox.classList.add('selected');
+                }
+                checkbox.dataset.teamName = team.teamName;
+                
+                const teamNameSpan = document.createElement('span');
+                teamNameSpan.textContent = team.teamName;
+                
+                header.appendChild(checkbox);
+                header.appendChild(teamNameSpan);
+                
+                const card = state.currentRosterView === 'positional' ? createPositionalTeamCard(team) : createDepthChartTeamCard(team);
+                
+                columnWrapper.appendChild(header);
+                columnWrapper.appendChild(card);
+                rosterGrid.appendChild(columnWrapper);
+            });
+        }
+
+        function createDepthChartTeamCard(team) {
+            const card = document.createElement('div');
+            card.className = 'team-card';
+            card.innerHTML = `<div class="roster-section starters-section"><h3>Starters</h3></div><div class="roster-section bench-section"><h3>Bench</h3></div><div class="roster-section taxi-section"><h3>Taxi</h3></div><div class="roster-section picks-section"><h3>Draft Picks</h3></div>`;
+            
+            const filterActive = state.activePositions.size > 0;
+            const filterFunc = player => !filterActive || state.activePositions.has(player.pos) || (state.activePositions.has('FLX') && ['RB', 'WR', 'TE'].includes(player.pos));
+
+            const populate = (sel, data, creator) => {
+                const el = card.querySelector(sel);
+                const filteredData = data.filter(item => item.isPlaceholder || filterFunc(item));
+                
+                const h3 = el.querySelector('h3');
+                el.innerHTML = '';
+                el.appendChild(h3);
+
+                if (filteredData.length > 0) {
+                    filteredData.forEach(item => el.appendChild(creator(item)));
+                } else {
+                    el.innerHTML += `<div class="text-xs text-slate-500 p-1 italic">None</div>`;
+                }
+            };
+
+            populate('.starters-section', team.starters, createPlayerRow);
+            populate('.bench-section', team.bench, createPlayerRow);
+            populate('.taxi-section', team.taxi, createTaxiRow);
+            
+            const picksEl = card.querySelector('.picks-section');
+            const picksH3 = picksEl.querySelector('h3');
+            picksEl.innerHTML = '';
+            picksEl.appendChild(picksH3);
+            if (team.draftPicks && team.draftPicks.length > 0) {
+                team.draftPicks.forEach(item => picksEl.appendChild(createPickRow(item)));
+            } else {
+                picksEl.innerHTML += `<div class="text-xs text-slate-500 p-1 italic">None</div>`;
+            }
+            return card;
+        }
+
+        function createPositionalTeamCard(team) {
+            const card = document.createElement('div');
+            card.className = 'team-card';
+            card.innerHTML = `
+                <div class="roster-section qb-section"><h3>QB</h3></div>
+                <div class="roster-section rb-section"><h3>RB</h3></div>
+                <div class="roster-section wr-section"><h3>WR</h3></div>
+                <div class="roster-section te-section"><h3>TE</h3></div>
+                <div class="roster-section picks-section"><h3>Draft Picks</h3></div>
+            `;
+
+            const filterActive = state.activePositions.size > 0;
+            const isFlexActive = state.activePositions.has('FLX');
+
+            const positions = {
+                QB: team.allPlayers.filter(p => p.pos === 'QB').sort((a, b) => (b.ktc || 0) - (a.ktc || 0)),
+                RB: team.allPlayers.filter(p => p.pos === 'RB').sort((a, b) => (b.ktc || 0) - (a.ktc || 0)),
+                WR: team.allPlayers.filter(p => p.pos === 'WR').sort((a, b) => (b.ktc || 0) - (a.ktc || 0)),
+                TE: team.allPlayers.filter(p => p.pos === 'TE').sort((a, b) => (b.ktc || 0) - (a.ktc || 0)),
+            };
+
+            const populate = (sel, data, creator) => {
+                const el = card.querySelector(sel);
+                const pos = sel.split('-')[0].toUpperCase().replace('.', '');
+                
+                el.style.display = 'none';
+                if (!filterActive || state.activePositions.has(pos) || (isFlexActive && ['RB', 'WR', 'TE'].includes(pos))) {
+                    el.style.display = 'block';
+                    const h3 = el.querySelector('h3');
+                    el.innerHTML = '';
+                    el.appendChild(h3);
+                    if (data && data.length > 0) {
+                        data.forEach(item => el.appendChild(creator(item)));
+                    } else {
+                        el.innerHTML += `<div class="text-xs text-slate-500 p-1 italic">None</div>`;
+                    }
+                }
+            };
+
+            populate('.qb-section', positions.QB, createPlayerRow);
+            populate('.rb-section', positions.RB, createPlayerRow);
+            populate('.wr-section', positions.WR, createPlayerRow);
+            populate('.te-section', positions.TE, createPlayerRow);
+            
+            const picksEl = card.querySelector('.picks-section');
+            if (picksEl) {
+                const picksH3 = picksEl.querySelector('h3');
+                picksEl.innerHTML = '';
+                picksEl.appendChild(picksH3);
+                if (team.draftPicks && team.draftPicks.length > 0) {
+                    team.draftPicks.forEach(item => picksEl.appendChild(createPickRow(item)));
+                } else {
+                    picksEl.innerHTML += `<div class="text-xs text-slate-500 p-1 italic">None</div>`;
+                }
+            }
+            return card;
+        }
+
+        function createEmptyTaxiRow() {
+            const row = document.createElement('div');
+            row.className = 'player-row';
+            row.innerHTML = `<span style="color: var(--color-text-tertiary); font-style: italic; font-size: 0.8rem; padding: 1.2rem 0.5rem; display: block; width: 100%; text-align: center;">Empty Slot</span>`;
+            return row;
+        }
+        
+        function createTaxiRow(item) {
+            if (item.isPlaceholder) return createEmptyTaxiRow();
+            return createPlayerRow(item);
+        }
+
+        function createPlayerRow(player) {
+            const row = document.createElement('div');
+            row.className = 'player-row';
+            row.dataset.assetId = player.id;
+            row.dataset.assetLabel = player.name;
+            row.dataset.assetKtc = player.ktc || 0;
+
+            if (state.isCompareMode && state.tradeBlock[row.closest('.roster-column')?.dataset.teamName]?.find(a => a.id === player.id)) {
+                row.classList.add('player-selected');
+            }
+
+            const adp = player.adp ? player.adp.toFixed(1) : '—';
+            const ktc = player.ktc || '—';
+            const slotAbbr = { 'SUPER_FLEX': 'SFLX', 'FLEX': 'FLX' };
+            const displaySlot = state.currentRosterView === 'depth' ? (slotAbbr[player.slot] || player.slot) : player.pos;
+            const teamTagHTML = player.team && player.team !== 'FA' 
+                ? `<div class="team-tag" style="background-color: ${TEAM_COLORS[player.team] || '#64748b'}; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);">${player.team}</div>` 
+                : `<div class="team-tag" style="background-color: #64748b; color: white;">${player.team || 'FA'}</div>`;
+
+            const posRankColor = getPosRankColor(player.posRank);
+
+            row.innerHTML = `
+                <div class="player-main-line">
+                    <div class="player-tag" style="background-color: ${TAG_COLORS[displaySlot] || 'var(--pos-bn)'};">${displaySlot}</div>
+                    <div class="player-name">${player.name}</div>
+                </div>
+                <div class="player-meta-line">
+                    <span class="player-pos-rank" style="color: ${posRankColor}; font-weight: 700;">${player.posRank || player.pos}</span>
+                    <span class="separator">•</span>
+                    <span>Age: <span class="player-age">${player.age || '?'}</span></span>
+                    <span class="separator">•</span>
+                    ${teamTagHTML}
+                </div>
+                <div class="player-value-line">
+                    <span>KTC: <span class="value player-ktc">${ktc}</span></span>
+                    <span>ADP: <span class="value player-adp">${adp}</span></span>
+                </div>
+            `;
+            
+            const ageEl = row.querySelector('.player-age'), adpEl = row.querySelector('.player-adp'), ktcEl = row.querySelector('.player-ktc');
+            if (ageEl && player.age) ageEl.style.color = getAgeColorForRoster(player.pos, player.age);
+            if (adpEl && player.adp) adpEl.style.color = getAdpColorForRoster(parseFloat(adp));
+            if (ktcEl && player.ktc) ktcEl.style.color = getKtcColor(player.ktc);
+            return row;
+        }
+
+        function createPickRow(pick) {
+            const row = document.createElement('div');
+            row.className = 'pick-row';
+            row.dataset.assetId = pick.id;
+            row.dataset.assetLabel = pick.label;
+            row.dataset.assetKtc = pick.ktc || 0;
+
+            if (state.isCompareMode && state.tradeBlock[row.closest('.roster-column')?.dataset.teamName]?.find(a => a.id === pick.id)) {
+                row.classList.add('player-selected');
+            }
+            
+            const ktcValue = pick.ktc || '—';
+            row.innerHTML = `<span class="pick-label">${pick.label}</span><span class="pick-ktc">KTC: <span class="value">${ktcValue}</span></span>`;
+            if (pick.ktc) row.querySelector('.pick-ktc .value').style.color = getKtcColor(pick.ktc);
+            return row;
+        }
+
+        function renderTradeBlock() {
+            if (!state.isCompareMode || state.teamsToCompare.size < 2) {
+                tradeSimulator.style.display = 'none';
+                mainContent.style.paddingBottom = '1rem';
+                return;
+            }
+
+            tradeSimulator.style.display = 'block';
+            tradeSimulator.innerHTML = `
+                <div class="trade-container glass-panel">
+                    <div class="trade-header">
+                        <h3>Trade Preview</h3>
+                        <button id="clearTradeButton">Clear</button>
+                    </div>
+                    <div class="trade-body"></div>
+                </div>
+            `;
+
+            const tradeBody = tradeSimulator.querySelector('.trade-body');
+            const teamNames = Array.from(state.teamsToCompare);
+            const tradeData = {};
+
+            teamNames.forEach(name => {
+                const assets = state.tradeBlock[name] || [];
+                const totalKtc = assets.reduce((sum, asset) => sum + asset.ktc, 0);
+                tradeData[name] = { assets, totalKtc };
+            });
+
+            const totals = teamNames.map(name => tradeData[name].totalKtc);
+            const totalClasses = {};
+
+            if (teamNames.length === 2) {
+                const diff = totals[0] - totals[1];
+                if (diff > 500) {
+                    totalClasses[teamNames[0]] = 'winning';
+                    totalClasses[teamNames[1]] = 'losing';
+                } else if (diff < -500) {
+                    totalClasses[teamNames[0]] = 'losing';
+                    totalClasses[teamNames[1]] = 'winning';
+                } else {
+                    totalClasses[teamNames[0]] = 'even';
+                    totalClasses[teamNames[1]] = 'even';
+                }
+            }
+
+            let bodyHtml = '';
+            teamNames.forEach((teamName, index) => {
+                const { assets, totalKtc } = tradeData[teamName];
+                let assetsHTML = '';
+                if (assets.length > 0) {
+                    assets.forEach(asset => {
+                        const ktcColor = getKtcColor(asset.ktc);
+                        assetsHTML += `<div class="trade-asset-chip"><span>${asset.label}</span><span class="ktc" style="color: ${ktcColor}">(${asset.ktc})</span></div>`;
+                    });
+                } else {
+                    assetsHTML = `<span class="text-xs text-slate-500 p-2">Select assets...</span>`;
+                }
+                
+                const totalClass = totalClasses[teamName] || 'even';
+
+                bodyHtml += `
+                    <div class="trade-team-column">
+                        <h4>${teamName}</h4>
+                        <div class="trade-assets">${assetsHTML}</div>
+                        <div class="trade-total ${totalClass}">
+                            Total KTC: ${totalKtc}
+                        </div>
+                    </div>
+                `;
+
+                if (index < teamNames.length - 1 && teamNames.length > 1) {
+                     bodyHtml += `<div class="trade-divider"></div>`;
+                }
+            });
+            
+            tradeBody.innerHTML = bodyHtml;
+
+            document.getElementById('clearTradeButton').addEventListener('click', clearTrade);
+            mainContent.style.paddingBottom = `${tradeSimulator.offsetHeight + 40}px`;
+        }
+
+
+        // --- Player List (Ownership) Functions ---
+        async function renderPlayerList() {
+            playerListView.innerHTML = '<p class="text-center p-4">Fetching user leagues and rosters...</p>';
+            assignedLeagueColors.clear();
+            nextColorIndex = 0;
+            assignedRyColors.clear();
+            nextRyColorIndex = 0;
+
+            const userLeagues = await fetchUserLeagues(state.userId);
+            const rostersByLeague = await Promise.all(userLeagues.map(l => fetchWithCache(`${API_BASE}/league/${l.league_id}/rosters`)));
+
+            const agg = new Map();
+            rostersByLeague.forEach((rosters, idx) => {
+                const leagueName = userLeagues[idx].name;
+                const leagueAbbr = getLeagueAbbr(leagueName);
+                const myRoster = rosters.find(r => r.owner_id === state.userId || (Array.isArray(r.co_owners) && r.co_owners.includes(state.userId)));
+                if (!myRoster) return;
+                const pids = new Set((myRoster.players || []).filter(Boolean));
+                pids.forEach(pid => {
+                    if (!agg.has(pid)) agg.set(pid, new Set());
+                    agg.get(pid).add(leagueAbbr);
+                });
+            });
+
+            const section = document.createElement('div');
+            section.className = 'player-list-section';
+            
+            const header = createPlayerListHeader();
+            section.appendChild(header);
+
+            const rows = Array.from(agg.entries()).map(([pid, leagueSet]) => createPlayerListRow(pid, leagueSet, userLeagues.length)).filter(Boolean);
+            rows.sort((a, b) => {
+                const countDiff = Number(b.dataset.count || 0) - Number(a.dataset.count || 0);
+                if (countDiff !== 0) return countDiff;
+                return a.dataset.search.localeCompare(b.dataset.search);
+            });
+
+            rows.forEach(r => section.appendChild(r));
+            playerListView.innerHTML = '';
+            
+            const searchInput = document.createElement('input');
+            searchInput.id = 'playerSearch';
+            searchInput.type = 'text';
+            searchInput.placeholder = 'Filter players by name...';
+            playerListView.appendChild(searchInput);
+            playerListView.appendChild(section);
+
+            searchInput.oninput = () => {
+                const term = searchInput.value.trim().toLowerCase();
+                section.querySelectorAll('.pl-player-row:not(.pl-list-header)').forEach(r => {
+                    r.style.display = (r.dataset.search || '').includes(term) ? 'flex' : 'none';
+                });
+            };
+        }
+
+        function createPlayerListHeader() {
+            const header = document.createElement('div');
+            header.className = 'pl-player-row pl-list-header';
+            
+            const tagSpacer = document.createElement('div');
+            tagSpacer.className = 'pl-list-tag-spacer';
+            header.appendChild(tagSpacer);
+
+            const headerInfo = document.createElement('div');
+            headerInfo.className = 'pl-player-info';
+            headerInfo.innerHTML = '<div class="pl-player-name">Player & Info</div>';
+            header.appendChild(headerInfo);
+
+            const headerMeta = document.createElement('div');
+            headerMeta.className = 'pl-right-meta';
+            headerMeta.innerHTML = `
+                <span class="pl-col-count">#</span>
+                <span class="pl-col-pct">%</span>
+                <span class="pl-col-lgs">Leagues</span>
+            `;
+            header.appendChild(headerMeta);
+            
+            return header;
+        }
+
+        function createPlayerListRow(pid, leagueSet, totalLeagues) {
+            const p = state.players[pid];
+            if (!p) return null;
+
+            const pos = p.position || (p.fantasy_positions && p.fantasy_positions[0]) || '';
+            const first = (p.first_name || '').trim();
+            const last = (p.last_name || '').trim();
+            let displayName = `${first} ${last}`.trim() || pid;
+            if (first && last) displayName = `${first.charAt(0)}. ${last}`;
+
+            const row = document.createElement('div');
+            row.className = 'pl-player-row';
+            row.dataset.search = `${first.toLowerCase()} ${last.toLowerCase()} ${displayName.toLowerCase()}`;
+            row.dataset.count = leagueSet.size;
+
+            const detailParts = [];
+            const adp1QB = state.oneQbData[pid]?.adp;
+            const adpSFLX = state.sflxData[pid]?.adp;
+            const rookieYear = deriveRookieYear(p);
+            if (adp1QB) detailParts.push(`ADP <span style="color:${getAdpColorForRoster(adp1QB) || 'inherit'}">${adp1QB.toFixed(1)}</span>`);
+            if (adpSFLX) detailParts.push(`SFLX <span style="color:${getAdpColorForRoster(adpSFLX) || 'inherit'}">${adpSFLX.toFixed(1)}</span>`);
+            if (rookieYear) detailParts.push(`RY <span style="color:${getRyColor(rookieYear) || 'inherit'}">${rookieYear}</span>`);
+            const detailsHTML = detailParts.join(' • ');
+
+            const count = leagueSet.size;
+            const pctVal = Math.round((count / totalLeagues) * 100);
+            let countClass, pctClass;
+            if (pctVal >= 80) { countClass = 'pl-count-high'; pctClass = 'pl-pct-high'; }
+            else if (pctVal >= 50) { countClass = 'pl-count-mid'; pctClass = 'pl-pct-mid'; }
+            else { countClass = 'pl-count-low'; pctClass = 'pl-pct-low'; }
+
+            const sortedAbbrs = Array.from(leagueSet).sort();
+            const leaguesHTML = sortedAbbrs.map((abbr, index) => `<span style="color: ${getLeagueColor(abbr)}">${abbr}</span>`).join(', ');
+
+            row.innerHTML = `
+                <div class="pl-list-tag" style="background-color: ${TAG_COLORS[pos] || 'var(--pos-bn)'};">${pos}</div>
+                <div class="pl-player-info">
+                    <div class="pl-player-name">
+                        <span>${displayName}</span>
+                        <div class="team-tag" style="background-color: ${TEAM_COLORS[p.team] || '#64748b'}; color: white;">${p.team || 'FA'}</div>
+                        ${p.age ? `<span style="font-size: 0.8rem; color: var(--color-text-tertiary);">Age: <span style="color:${getAgeColorForRoster(p.position, p.age) || 'inherit'}">${p.age}</span></span>` : ''}
+                    </div>
+                    <div class="pl-player-details">${detailsHTML}</div>
+                </div>
+                <div class="pl-right-meta">
+                    <span class="pl-col-count ${countClass}">${count}</span>
+                    <span class="pl-col-pct ${pctClass}">${pctVal}%</span>
+                    <span class="pl-col-lgs">${leaguesHTML}</span>
+                </div>
+            `;
+            
+            return row;
+        }
+
+        // --- Formatting Helpers ---
+        function deriveRookieYear(player) {
+            if (!player) return null;
+            let ry = player.metadata?.rookie_year ? Number(player.metadata.rookie_year) : 0;
+            const exp = player.years_exp;
+            const expNum = (exp === '' || exp === null || exp === undefined) ? null : Number(exp);
+            if ((!ry || ry === 0) && expNum === 0) {
+                return new Date().getFullYear();
+            }
+            return ry > 0 ? ry : null;
+        }
+        function getPosRankColor(posRank) {
+            if (!posRank || typeof posRank !== 'string') return 'var(--color-text-secondary)';
+            const position = posRank.split('·')[0];
+            const colors = {
+                QB: '#FF7AB2',
+                RB: '#bbf7e0',
+                WR: '#A0C2F7',
+                TE: '#ffae58'
+            };
+            return colors[position] || 'var(--color-text-secondary)';
+        }
+        function getKtcColor(v){const s=[{v:9e3,c:"#00EEB6"},{v:8e3,c:"#14D7CB"},{v:7e3,c:"#0599AA"},{v:6e3,c:"#03a8ce"},{v:5500,c:"#0690DC"},{v:5e3,c:"#066CDC"},{v:4500,c:"#1350fd"},{v:4e3,c:"#5e41ff"},{v:3750,c:"#7158ff"},{v:3500,c:"#964eff"},{v:3250,c:"#9200ff"},{v:3e3,c:"#b70fff"},{v:2750,c:"#ba00cc"},{v:2500,c:"#e800ff"},{v:2250,c:"#db00af"},{v:2e3,c:"#c70097"},{v:0,c:"#FF0080"}];if(v===null||v===0)return"#e0e6ed";for(const t of s)if(v>=t.v)return t.c;return s[s.length-1].c}
+        function getAdpColorForRoster(a){const s=[{v:12,c:"#00EEB6"},{v:24,c:"#14D7CB"},{v:36,c:"#0599AA"},{v:48,c:"#03a8ce"},{v:60,c:"#0690DC"},{v:72,c:"#066CDC"},{v:84,c:"#1350fd"},{v:96,c:"#5e41ff"},{v:108,c:"#7158ff"},{v:120,c:"#964eff"},{v:144,c:"#9200ff"},{v:168,c:"#b70fff"},{v:192,c:"#ba00cc"},{v:216,c:"#e800ff"},{v:240,c:"#db00af"},{v:280,c:"#c70097"},{v:320,c:"#FF0080"}];if(!a||a===0)return null;for(const t of s)if(a<=t.v)return t.c;return s[s.length-1].c}
+        function getAgeColorForRoster(p,a){const s={wrTe:[{v:22.5,c:"#00ffc4"},{v:25,c:"#85fff3"},{v:26,c:"#56dfe8"},{v:27,c:"#7dd1ff"},{v:29,c:"#89a3ff"},{v:30,c:"#957cff"},{v:31,c:"#a642ff"},{v:32,c:"#cf60ff"},{v:33,c:"#ff6fe1"}],rb:[{v:22.5,c:"#00ffc4"},{v:24,c:"#85fff3"},{v:25,c:"#56dfe8"},{v:26,c:"#7dd1ff"},{v:27,c:"#89a3ff"},{v:28,c:"#957cff"},{v:29,c:"#a642ff"},{v:30,c:"#cf60ff"},{v:31,c:"#ff6fe1"}],qb:[{v:25.5,c:"#00ffc4"},{v:28,c:"#85fff3"},{v:29,c:"#7dd1ff"},{v:31,c:"#48a6ff"},{v:33,c:"#957cff"},{v:36,c:"#a642ff"},{v:40,c:"#cf60ff"},{v:44,c:"#ff6fe1"}]};let sc=p==="WR"||p==="TE"?s.wrTe:p==="RB"?s.rb:p==="QB"?s.qb:null;if(!sc||!a||a===0)return null;for(const t of sc)if(a<=t.v)return t.c;return sc[sc.length-1].c}
+        function getLeagueAbbr(name) { if (!name) return "LG"; if (LEAGUE_ABBR_OVERRIDES[name]) return LEAGUE_ABBR_OVERRIDES[name]; if (name.length <= 4 && !name.includes(' ') && !name.includes('-')) return name.toUpperCase(); const words = name.split(/[\s-]+/); let abbr = words.map(w => w[0] || '').join(''); return abbr.toUpperCase(); }
+        function getLeagueColor(abbr) { if (!assignedLeagueColors.has(abbr)) { assignedLeagueColors.set(abbr, LEAGUE_COLOR_PALETTE[nextColorIndex % LEAGUE_COLOR_PALETTE.length]); nextColorIndex++; } return assignedLeagueColors.get(abbr); }
+        function getRyColor(year) { if (!assignedRyColors.has(year)) { assignedRyColors.set(year, RY_COLOR_PALETTE[nextRyColorIndex % RY_COLOR_PALETTE.length]); nextRyColorIndex++; } return assignedRyColors.get(year); }
+        function ordinalSuffix(i){ const j=i%10, k=i%100; if(j===1&&k!==11) return i+'st'; if(j===2&&k!==12) return i+'nd'; if(j===3&&k!==13) return i+'rd'; return i+'th'; }
+
+        // --- Utility Functions ---
+        function setLoading(isLoading, message = 'Loading...') {
+            welcomeScreen.classList.add('hidden');
+            const buttons = [fetchRostersButton, fetchOwnershipButton];
+            if (isLoading) {
+                loadingIndicator.textContent = message;
+                loadingIndicator.classList.remove('hidden');
+                buttons.forEach(btn => { btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed'); });
+            } else {
+                loadingIndicator.classList.add('hidden');
+                buttons.forEach(btn => { btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed'); });
+            }
+        }
+
+        function handleError(error, username) {
+            console.error(`Error for user ${username}:`, error);
+            welcomeScreen.classList.remove('hidden');
+            rosterView.classList.add('hidden');
+            playerListView.classList.add('hidden');
+            welcomeScreen.innerHTML = `<h2 class="text-red-400">Error</h2><p>Could not fetch data for user: ${username}</p><p>${error.message}</p>`;
+        }
+
+        async function fetchWithCache(url) {
+            if (state.cache[url]) return state.cache[url];
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`API request failed: ${response.statusText}`);
+            const data = await response.json();
+            state.cache[url] = data;
+            return data;
+        }
+    </script>
+</body>
+</html>
